@@ -20,56 +20,53 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     private val messageService: MessageService,
     private val chatSocketService: ChatSocketService,
-    private val savedStateHandle: SavedStateHandle
-) : ViewModel() {
+    private  val savedStateHandle:SavedStateHandle
+):ViewModel(){
     private val _messageText = mutableStateOf("")
-    val messageText: State<String> = _messageText
+    val messageText:State<String> = _messageText
 
     private val _state = mutableStateOf(ChatState())
-    val state: State<ChatState> = _state
+    val state:State<ChatState> = _state
 
     private val _toastEvent = MutableSharedFlow<String>()
     val toastEvent = _toastEvent.asSharedFlow()
 
     fun onConnect() {
         getAllMessages()
-        savedStateHandle.get<String>("username")?.let { username ->
-            viewModelScope.launch {
-                val result = chatSocketService.initSession(username)
-                when (result) {
-                    is Resource.Success -> {
-                        chatSocketService.observeMessages()
-                            .onEach { message ->
-                                val newlist = state.value.message.toMutableList().apply {
-                                    add(message)
-                                }
-                                _state.value = state.value.copy(
-                                    message = newlist
-                                )
-                            }.launchIn(viewModelScope)
-                    }
-                    is Resource.Error -> {
-                        _toastEvent.emit(result.message ?: "Unknown Error")
-                    }
-                }
-            }
-        }
+         savedStateHandle.get<String>("username")?.let { username->
+             viewModelScope.launch {
+                 val result = chatSocketService.initSession(username)
+                 when(result){
+                     is Resource.Success->{
+                     chatSocketService.observeMessages()
+                         .onEach { message ->
+                             val newlist = state.value.message.toMutableList().apply {
+                                 add(0, message)
+                             }
+                             _state.value = state.value.copy(
+                                 message = newlist
+                             )
+                         }.launchIn(viewModelScope)
+                     }
+                     is Resource.Error->{
+                         _toastEvent.emit(result.message?:"Unknown Error")
+                     }
+                 }
+             }
+         }
     }
-
-    fun onMessageChange(message: String) {
-        _messageText.value = message.trim()
+    fun onMessageChange(message:String){
+        _messageText.value = message
     }
-
-    fun disconnect() {
-        viewModelScope.launch {
-            chatSocketService.closeSession()
-        }
-    }
-
-    fun getAllMessages() {
+     fun disconnect(){
+         viewModelScope.launch {
+             chatSocketService.closeSession()
+         }
+     }
+    fun getAllMessages(){
         viewModelScope.launch {
             _state.value = state.value.copy(isLoading = true)
-            val result = messageService.getAllMessage() ?: emptyList()
+            val result = messageService.getAllMessage()
             _state.value = state.value.copy(
                 message = result,
                 isLoading = false
@@ -77,14 +74,14 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun sendMessage() {
+    fun sendMessage(){
         viewModelScope.launch {
             if (messageText.value.isNotBlank()) {
                 chatSocketService.sendMessage(messageText.value)
-                _messageText.value = ""
             }
         }
     }
+
 
     override fun onCleared() {
         super.onCleared()
